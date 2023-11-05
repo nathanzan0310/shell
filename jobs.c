@@ -23,7 +23,7 @@ struct job_list {
 
 /* initializes job list, returns pointer */
 job_list_t *init_job_list() {
-    job_list_t *job_list = (job_list_t *)malloc(sizeof(job_list_t));
+    job_list_t *job_list = (job_list_t *) malloc(sizeof(job_list_t));
     job_list->head = NULL;
     job_list->current = NULL;
     job_list->shell_pid = getpid();
@@ -76,7 +76,7 @@ int add_job(job_list_t *job_list, int jid, pid_t pid, process_state_t state,
         return -1;
     }
 
-    job_element_t *new = (job_element_t *)malloc(sizeof(job_element_t));
+    job_element_t *new = (job_element_t *) malloc(sizeof(job_element_t));
     new->jid = jid;
     new->pid = pid;
 
@@ -84,7 +84,7 @@ int add_job(job_list_t *job_list, int jid, pid_t pid, process_state_t state,
     new->state = state;
 
     size_t cmdlen = strlen(command);
-    new->command = (char *)malloc(sizeof(char) * (cmdlen + 1));
+    new->command = (char *) malloc(sizeof(char) * (cmdlen + 1));
     memcpy(new->command, command, cmdlen);
     new->command[cmdlen] = 0;
     new->next = NULL;
