@@ -1,4 +1,5 @@
 #include <dirent.h>
+#include <signal.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -6,8 +7,8 @@
 #include <sys/file.h>
 #include <sys/wait.h>
 #include <unistd.h>
-#include "parsing.c"
 #include "./jobs.h"
+#include "parsing.c"
 
 int install_handler(int sig, void (*handler)(int));
 
@@ -15,9 +16,7 @@ void sigint_handler(int sig);
 
 void sigtstp_handler(int sig);
 
-//void sigquit_handler(int sig);
-
-int counter;
+void sigttou_handler(int sig);
 
 int main(void) {
     /* TODO: everything! */
@@ -32,6 +31,7 @@ int main(void) {
     int stdout_copy = dup(STDOUT_FILENO);
     int fileIn;   // new input file
     int fileOut;  // new output file
+
     sigset_t old;
     sigset_t full;
     sigfillset(&full);
@@ -46,18 +46,28 @@ int main(void) {
     if (install_handler(SIGTSTP, &sigtstp_handler))
         perror("Warning: could not install handler for SIGTSTP");
 
-//    if (install_handler(SIGQUIT, &sigquit_handler))
-//        perror("Warning: could not install handler for SIGQUIT");
+    if (install_handler(SIGTTOU, &sigttou_handler))
+        perror("Warning: could not install handler for SIGTTOU");
 
     // Restore signal mask to previous value
     sigprocmask(SIG_SETMASK, &old, NULL);
 
     while (n > 0) {
+        int wret;
+        int wstatus;
+        while ((wret = waitpid(-1, &wstatus, WNOHANG | WUNTRACED)) > 0) {
+            if (WIFEXITED(wstatus)) {
+            }
+            if (WIFSIGNALED(wstatus)) {
+            }
+            if (WIFSTOPPED(wstatus)) {
+            }
+        }
 #ifdef PROMPT
         if (printf("33sh> ") < 0) exit(1);
         if (fflush(stdout) < 0) exit(1);
 #endif
-        n = (int) read(STDIN_FILENO, buf, sizeof(buf));
+        n = (int)read(STDIN_FILENO, buf, sizeof(buf));
         buf[n] = '\0';
         memset(tokens, '\0', 512 * 4);  // reset tokens, argv, and redirects
         // every time we loop through
@@ -67,7 +77,6 @@ int main(void) {
         // possible redirect index values (e.g. 0)
         argc = 0;
         parse(buf, tokens, argv, redirects);
-
 
         if (redirects[0] != -1) {
             int i = 0;
@@ -93,7 +102,8 @@ int main(void) {
                 } else {
                     if (argv[0] == NULL) {
                         err = 1;
-                        fprintf(stderr, "syntax error: redirects with no command\n");
+                        fprintf(stderr,
+                                "syntax error: redirects with no command\n");
                     }
                 }
             }
@@ -210,11 +220,35 @@ int main(void) {
                         filepath += 2;
                     }
                 }
+                int childPid = getpid();
+                int childPGRP = getpgrp();
+                if (setpgid(childPid, 0) < 0) {
+                    perror("Child setpgid() error");
+                    exit(1);
+                }
+                if (tcsetpgrp(STDIN_FILENO, childPGRP) < 0) {
+                    perror("Child tcsetgrp() error");
+                    exit(1);
+                }
+                if (signal(SIGINT, SIG_DFL) == SIG_ERR) {
+                    perror("SIGINT child handler error.");
+                    exit(1);
+                }
+                if (signal(SIGTSTP, SIG_DFL) == SIG_ERR) {
+                    perror("SIGTSTP child handler error.");
+                    exit(1);
+                }
+                if (signal(SIGTTOU, SIG_DFL) == SIG_ERR) {
+                    perror("SIGTTOU child handler error.");
+                    exit(1);
+                }
                 execv(tokens[filepath], argv);
                 perror("execv");
                 exit(1);
             }
             wait(0);
+            int shellPid = getpid();
+            tcsetpgrp(STDIN_FILENO, shellPid);
             close(fileIn);
             close(fileOut);
             dup2(stdin_copy, STDIN_FILENO);
@@ -249,7 +283,10 @@ int install_handler(int sig, void (*handler)(int)) {
  */
 void sigint_handler(int sig) {
     // printf("Caught signal %d", sig);
-    signal(sig, SIG_IGN);
+    if (signal(sig, SIG_IGN) == SIG_ERR) {
+        perror("SIGINT handler error.");
+        exit(1);
+    }
 }
 
 /* sigtstp_handler
@@ -259,15 +296,21 @@ void sigint_handler(int sig) {
  */
 void sigtstp_handler(int sig) {
     // printf("Caught signal %d", sig);
-    signal(sig, SIG_IGN);
+    if (signal(sig, SIG_IGN) == SIG_ERR) {
+        perror("SIGSTP handler error.");
+        exit(1);
+    }
 }
 
 /* sigquit_handler
- * Catches SIGQUIT signal (CTRL-\)
+ * Catches SIGTTOU signal
  *
  * Argument: int sig - the integer code representing this signal
  */
-//void sigquit_handler(int sig) {
-//     printf("Caught signal %d", sig);
-//    signal(sig, sig_ign);
-//}
+void sigttou_handler(int sig) {
+    //    printf("Caught signal %d", sig);
+    if (signal(sig, SIG_IGN) == SIG_ERR) {
+        perror("SIGTTOU handler error.");
+        exit(1);
+    }
+}
