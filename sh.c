@@ -486,10 +486,6 @@ int main(void) {
                 }
                 tcsetpgrp(STDIN_FILENO, getpgrp());
             }
-            close(fileIn);
-            close(fileOut);
-            dup2(stdin_copy, STDIN_FILENO);
-            dup2(stdout_copy, STDOUT_FILENO);
         }
     }
     return 0;
