@@ -55,7 +55,7 @@ int main(void) {
             exit(1);
         }
 #endif
-        bytesRead = (int) read(STDIN_FILENO, buf, sizeof(buf));
+        bytesRead = (int)read(STDIN_FILENO, buf, sizeof(buf));
         buf[bytesRead] = '\0';
         if (bytesRead == -1) {
             cleanup_job_list(job_list);
@@ -95,8 +95,8 @@ int main(void) {
                             "syntax error: too many output/input redirects\n") <
                         0) {
                         perror(
-                                "Error printing too many output/input redirects "
-                                "error");
+                            "Error printing too many output/input redirects "
+                            "error");
                         cleanup_job_list(job_list);
                         exit(1);
                     }
@@ -117,8 +117,8 @@ int main(void) {
                                 "syntax error: redirects with no command\n") <
                             0) {
                             perror(
-                                    "Error printing redirects with no command "
-                                    "error");
+                                "Error printing redirects with no command "
+                                "error");
                             cleanup_job_list(job_list);
                             exit(1);
                         }
@@ -142,8 +142,8 @@ int main(void) {
                         if (fprintf(stderr,
                                     "open: No such file or directory\n") < 0) {
                             perror(
-                                    "Error printing no such file or directory "
-                                    "error");
+                                "Error printing no such file or directory "
+                                "error");
                             cleanup_job_list(job_list);
                             exit(1);
                         }
@@ -186,8 +186,8 @@ int main(void) {
                         if (fprintf(stderr,
                                     "open: No such file or directory\n") < 0) {
                             perror(
-                                    "Error printing no such file or directory "
-                                    "error");
+                                "Error printing no such file or directory "
+                                "error");
                             cleanup_job_list(job_list);
                             exit(1);
                         }
@@ -322,7 +322,8 @@ int main(void) {
                 continue;
             }
             if (argv[1][0] != '%') {
-                if (fprintf(stderr, "%s: syntax error; need %%\n", tokens[0]) < 0) {
+                if (fprintf(stderr, "%s: syntax error; need %%\n", tokens[0]) <
+                    0) {
                     perror("Error printing bg syntax error");
                     cleanup_job_list(job_list);
                     exit(1);
@@ -358,7 +359,8 @@ int main(void) {
                 continue;
             }
             if (argv[1][0] != '%') {
-                if (fprintf(stderr, "%s: syntax error; need %%\n", tokens[0]) < 0) {
+                if (fprintf(stderr, "%s: syntax error; need %%\n", tokens[0]) <
+                    0) {
                     perror("Error printing fg syntax error");
                     cleanup_job_list(job_list);
                     exit(1);
