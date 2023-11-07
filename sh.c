@@ -23,6 +23,7 @@ int main(void) {
     int bytesRead = 1;
     int fileIn;      // new input file
     int fileOut;     // new output file
+    int filepath = 0;  // filepath index accounting for redirects
     int background;  // background flag
     int jid = 1;
     int stdin_copy = dup(STDIN_FILENO);
@@ -55,7 +56,7 @@ int main(void) {
             exit(1);
         }
 #endif
-        bytesRead = (int)read(STDIN_FILENO, buf, sizeof(buf));
+        bytesRead = (int) read(STDIN_FILENO, buf, sizeof(buf));
         buf[bytesRead] = '\0';
         if (bytesRead == -1) {
             cleanup_job_list(job_list);
@@ -95,8 +96,8 @@ int main(void) {
                             "syntax error: too many output/input redirects\n") <
                         0) {
                         perror(
-                            "Error printing too many output/input redirects "
-                            "error");
+                                "Error printing too many output/input redirects "
+                                "error");
                         cleanup_job_list(job_list);
                         exit(1);
                     }
@@ -117,8 +118,8 @@ int main(void) {
                                 "syntax error: redirects with no command\n") <
                             0) {
                             perror(
-                                "Error printing redirects with no command "
-                                "error");
+                                    "Error printing redirects with no command "
+                                    "error");
                             cleanup_job_list(job_list);
                             exit(1);
                         }
@@ -142,8 +143,8 @@ int main(void) {
                         if (fprintf(stderr,
                                     "open: No such file or directory\n") < 0) {
                             perror(
-                                "Error printing no such file or directory "
-                                "error");
+                                    "Error printing no such file or directory "
+                                    "error");
                             cleanup_job_list(job_list);
                             exit(1);
                         }
@@ -186,8 +187,8 @@ int main(void) {
                         if (fprintf(stderr,
                                     "open: No such file or directory\n") < 0) {
                             perror(
-                                "Error printing no such file or directory "
-                                "error");
+                                    "Error printing no such file or directory "
+                                    "error");
                             cleanup_job_list(job_list);
                             exit(1);
                         }
@@ -376,7 +377,7 @@ int main(void) {
                 continue;
             } else {
                 if (kill(-1 * cur_pid, SIGCONT) == 0) {
-                    remove_job_pid(job_list, cur_pid);
+                    remove_job_jid(job_list, atoi(argv[1] + 1));
                 } else {
                     if (fprintf(stderr, "%s: kill error\n", tokens[0]) < 0) {
                         perror("Error printing kill error");
@@ -384,9 +385,11 @@ int main(void) {
                         exit(1);
                     }
                 }
+                int cur_jid = atoi(argv[1] + 1);
                 int status;
-                waitpid(cur_pid, &status, WUNTRACED);
                 tcsetpgrp(STDIN_FILENO, cur_pid);
+                waitpid(cur_pid, &status, WUNTRACED);
+//                printf("command fg: %s\n", command[0]);
                 if (status == -1) {
                     perror("Error waitpid");
                 } else if (WIFSIGNALED(status)) {
@@ -397,10 +400,10 @@ int main(void) {
                         exit(1);
                     }
                 } else if (WIFSTOPPED(status)) {
-                    add_job(job_list, jid, cur_pid, STOPPED, command[0]);
-                    jid++;
+                    add_job(job_list, cur_jid, cur_pid, STOPPED, command[0]);
+//                    jid++;
                     if (printf("[%d] (%d) suspended by signal %d\n",
-                               get_job_jid(job_list, cur_pid), cur_pid,
+                               cur_jid, cur_pid,
                                WSTOPSIG(status)) < 0) {
                         perror("Error printing signal suspension.");
                         cleanup_job_list(job_list);
@@ -410,10 +413,10 @@ int main(void) {
                 tcsetpgrp(STDIN_FILENO, getpgrp());
             }
         } else {
-            int filepath = 0;  // filepath index accounting for redirects
-            for (int i = 0; redirects[i] != -1; i++)
+            for (int i = 0; redirects[i] != -1; i++) //getting command index while accounting for redirect chars
                 if (redirects[i] == 0) filepath += 2;
-            command[0] = tokens[filepath];
+            if (strcmp(tokens[filepath], "fg") != 0)  //non-fg command setting
+                command[0] = tokens[filepath];
             pid_t pid = fork();
             if (!pid) {
                 setpgid(pid, getpid());
@@ -450,7 +453,7 @@ int main(void) {
                     cleanup_job_list(job_list);
                     exit(1);
                 }
-                if (add_job(job_list, jid, pid, RUNNING, command[0]) < 0) {
+                if (add_job(job_list, jid, pid, RUNNING, tokens[filepath]) < 0) {
                     perror("Error add job");
                     cleanup_job_list(job_list);
                     exit(1);
@@ -469,7 +472,7 @@ int main(void) {
                         exit(1);
                     }
                 } else if (WIFSTOPPED(status)) {
-                    add_job(job_list, jid, pid, STOPPED, command[0]);
+                    add_job(job_list, jid, pid, STOPPED, tokens[filepath]);
                     jid++;
                     if (printf("[%d] (%d) suspended by signal %d\n",
                                get_job_jid(job_list, pid), pid,
