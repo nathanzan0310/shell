@@ -2,11 +2,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "./jobs.h"
 
 // The function checks for any syntax error in our redirects, and if we have any
 // we will return -1, otherwise we return 0
-int redirectsErrorChecker(char *tokens[512], int redirects[512],
+int redirectsErrorChecker(char *tokens[512], const int redirects[512],
                           char *argv[512], job_list_t *job_list) {
     int i = 0;
     int oc = 0;  // output redirect counter

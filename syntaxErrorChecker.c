@@ -2,7 +2,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "./jobs.h"
 
 // For the given command, we check for syntax errors and return -1 if we have
 // any, otherwise we return 0
@@ -26,7 +25,7 @@ int syntaxErrorChecker(char *command, char *argv[512], int argc,
             }
             return -1;
         }
-        if (get_job_pid(job_list, atoi(argv[1] + 1)) == -1) {
+        if (get_job_pid(job_list, (int)strtol(argv[1] + 1, NULL, 10)) == -1) {
             if (fprintf(stderr, "%s: invalid job id\n", command) < 0) {
                 perror("Error printing invalid job id error");
                 cleanup_job_list(job_list);

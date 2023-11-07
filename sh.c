@@ -35,35 +35,35 @@ int main(void) {
         SIG_ERR) {  // Ignore following signals when no foreground process
         perror("SIGINT ignore error.");
         cleanup_job_list(job_list);
-        exit(1);
+        exit(0);
     }
     if (signal(SIGTSTP, SIG_IGN) == SIG_ERR) {
         perror("SIGTSTP handler error.");
         cleanup_job_list(job_list);
-        exit(1);
+        exit(0);
     }
     if (signal(SIGTTOU, SIG_IGN) == SIG_ERR) {
         perror("SIGTTOU handler error.");
         cleanup_job_list(job_list);
-        exit(1);
+        exit(0);
     }
     while (bytesRead > 0) {
         childReaper(job_list);  // reap zombie processes
 #ifdef PROMPT
         if (printf("33sh> ") < 0) {
             cleanup_job_list(job_list);
-            exit(1);
+            exit(0);
         }
         if (fflush(stdout) < 0) {
             cleanup_job_list(job_list);
-            exit(1);
+            exit(0);
         }
 #endif
         bytesRead = read(STDIN_FILENO, buf, sizeof(buf));
         buf[bytesRead] = '\0';
         if (bytesRead == -1) {
             cleanup_job_list(job_list);
-            exit(1);
+            exit(0);
         }
         if (bytesRead == 0) {
             cleanup_job_list(job_list);
@@ -88,7 +88,7 @@ int main(void) {
                         if (fprintf(stderr, "Error closing stdin\n") < 0) {
                             perror("Error printing closing stdin error");
                             cleanup_job_list(job_list);
-                            exit(1);
+                            exit(0);
                         }
                         break;
                     }
@@ -101,7 +101,7 @@ int main(void) {
                                 "Error printing no such file or directory "
                                 "error");
                             cleanup_job_list(job_list);
-                            exit(1);
+                            exit(0);
                         }
                         break;
                     }
@@ -110,7 +110,7 @@ int main(void) {
                         if (fprintf(stderr, "Error closing stdout\n") < 0) {
                             perror("Error printing closing stdout error");
                             cleanup_job_list(job_list);
-                            exit(1);
+                            exit(0);
                         }
                         break;
                     }
@@ -122,7 +122,7 @@ int main(void) {
                                     "open: No such file or directory\n") < 0) {
                             perror("Error printing no such file or directory");
                             cleanup_job_list(job_list);
-                            exit(1);
+                            exit(0);
                         }
                         break;
                     }
@@ -131,7 +131,7 @@ int main(void) {
                         if (fprintf(stderr, "Error closing stdout\n") < 0) {
                             perror("Error printing closing stdout error");
                             cleanup_job_list(job_list);
-                            exit(1);
+                            exit(0);
                         }
                         break;
                     }
@@ -145,7 +145,7 @@ int main(void) {
                                 "Error printing no such file or directory "
                                 "error");
                             cleanup_job_list(job_list);
-                            exit(1);
+                            exit(0);
                         }
                         break;
                     }
@@ -174,7 +174,7 @@ int main(void) {
             if (d == NULL) {
                 perror("Error opening directory");
                 cleanup_job_list(job_list);
-                exit(1);
+                exit(0);
             }
             int found = 0;
             struct dirent *di;
@@ -189,14 +189,14 @@ int main(void) {
                 if (chdir(argv[1]) != 0) {
                     perror("Error changing directory");
                     cleanup_job_list(job_list);
-                    exit(1);
+                    exit(0);
                 }
             } else {
                 if (fprintf(stderr, "%s: No such file or directory.\n",
                             tokens[0]) < 0) {
                     perror("Error printing no such file or directory error");
                     cleanup_job_list(job_list);
-                    exit(1);
+                    exit(0);
                 }
                 continue;
             }
@@ -210,7 +210,7 @@ int main(void) {
                             tokens[0]) < 0) {
                     perror("Error printing no such file or directory error");
                     cleanup_job_list(job_list);
-                    exit(1);
+                    exit(0);
                 }
                 continue;
             }
@@ -222,7 +222,7 @@ int main(void) {
                             tokens[0]) < 0) {
                     perror("Error printing no such file or directory error");
                     cleanup_job_list(job_list);
-                    exit(1);
+                    exit(0);
                 }
                 continue;
             }
@@ -236,7 +236,7 @@ int main(void) {
             if (syntaxErrorChecker(tokens[0], argv, argc, job_list) == -1)
                 continue;
             else {
-                cur_jid = atoi(argv[1] + 1);
+                cur_jid = (int)strtol(argv[1] + 1, NULL, 10);
                 cur_pid = get_job_pid(job_list, cur_jid);
                 if (kill(-1 * cur_pid, SIGCONT) == 0) {
                     update_job_pid(job_list, cur_pid, RUNNING);
@@ -244,7 +244,7 @@ int main(void) {
                     if (fprintf(stderr, "%s: kill error\n", tokens[0]) < 0) {
                         perror("Error printing kill error");
                         cleanup_job_list(job_list);
-                        exit(1);
+                        exit(0);
                     }
                 }
             }
@@ -254,7 +254,7 @@ int main(void) {
             if (syntaxErrorChecker(tokens[0], argv, argc, job_list) == -1)
                 continue;
             else {
-                cur_jid = atoi(argv[1] + 1);
+                cur_jid = (int)strtol(argv[1] + 1, NULL, 10);
                 cur_pid = get_job_pid(job_list, cur_jid);
                 if (kill(-1 * cur_pid, SIGCONT) == 0) {
                     remove_job_jid(job_list, cur_jid);
@@ -262,7 +262,7 @@ int main(void) {
                     if (fprintf(stderr, "%s: kill error\n", tokens[0]) < 0) {
                         perror("Error printing kill error");
                         cleanup_job_list(job_list);
-                        exit(1);
+                        exit(0);
                     }
                 }
                 int status;
@@ -270,12 +270,14 @@ int main(void) {
                 waitpid(cur_pid, &status, WUNTRACED);
                 if (status == -1) {
                     perror("Error waitpid");
+                    cleanup_job_list(job_list);
+                    exit(0);
                 } else if (WIFSIGNALED(status)) {
                     if (printf("(%d) terminated by signal %d\n", cur_pid,
                                WTERMSIG(status)) < 0) {
                         perror("Error printing signal termination.");
                         cleanup_job_list(job_list);
-                        exit(1);
+                        exit(0);
                     }
                 } else if (WIFSTOPPED(status)) {
                     add_job(job_list, cur_jid, cur_pid, STOPPED, command[0]);
@@ -283,7 +285,7 @@ int main(void) {
                                cur_pid, WSTOPSIG(status)) < 0) {
                         perror("Error printing signal suspension.");
                         cleanup_job_list(job_list);
-                        exit(1);
+                        exit(0);
                     }
                 }
                 tcsetpgrp(STDIN_FILENO, getpgrp());
@@ -304,17 +306,17 @@ int main(void) {
                 if (signal(SIGINT, SIG_DFL) == SIG_ERR) {
                     perror("SIGINT child handler error.");
                     cleanup_job_list(job_list);
-                    exit(1);
+                    exit(0);
                 }
                 if (signal(SIGTSTP, SIG_DFL) == SIG_ERR) {
                     perror("SIGTSTP child handler error.");
                     cleanup_job_list(job_list);
-                    exit(1);
+                    exit(0);
                 }
                 if (signal(SIGTTOU, SIG_DFL) == SIG_ERR) {
                     perror("SIGTTOU child handler error.");
                     cleanup_job_list(job_list);
-                    exit(1);
+                    exit(0);
                 }
                 close(fileIn);
                 close(fileOut);
@@ -323,13 +325,13 @@ int main(void) {
                 execv(tokens[filepath], argv);
                 perror("execv");
                 cleanup_job_list(job_list);
-                exit(1);
+                exit(0);
             }
             if (background && tokens[filepath]) {
                 if (printf("[%d] (%d)\n", jid, pid) < 0) {
                     perror("Error add job print");
                     cleanup_job_list(job_list);
-                    exit(1);
+                    exit(0);
                 }
                 add_job(job_list, jid, pid, RUNNING, tokens[filepath]);
                 jid++;
@@ -338,12 +340,14 @@ int main(void) {
                 waitpid(pid, &status, WUNTRACED);
                 if (status == -1) {
                     perror("Error waitpid");
+                    cleanup_job_list(job_list);
+                    exit(0);
                 } else if (WIFSIGNALED(status)) {
                     if (printf("(%d) terminated by signal %d\n", pid,
                                WTERMSIG(status)) < 0) {
                         perror("Error printing signal termination.");
                         cleanup_job_list(job_list);
-                        exit(1);
+                        exit(0);
                     }
                 } else if (WIFSTOPPED(status)) {
                     add_job(job_list, jid, pid, STOPPED, tokens[filepath]);
@@ -353,7 +357,7 @@ int main(void) {
                                WSTOPSIG(status)) < 0) {
                         perror("Error printing signal suspension.");
                         cleanup_job_list(job_list);
-                        exit(1);
+                        exit(0);
                     }
                 }
                 tcsetpgrp(STDIN_FILENO, getpgrp());
