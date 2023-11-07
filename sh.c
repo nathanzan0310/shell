@@ -17,10 +17,10 @@ int main(void) {
     char *tokens[512];
     char *argv[512];
     int redirects[512];  // int array of redirect char indexes, excluding file
-                         // destinations
+    // destinations
     char *command[1] = {""};  // command string
     int argc;
-    int n = 1;
+    int bytesRead = 1;
     int fileIn;      // new input file
     int fileOut;     // new output file
     int background;  // background flag
@@ -55,13 +55,13 @@ int main(void) {
             exit(1);
         }
 #endif
-        n = (int)read(STDIN_FILENO, buf, sizeof(buf));
-        buf[n] = '\0';
-        if (n == -1) {
+        bytesRead = (int) read(STDIN_FILENO, buf, sizeof(buf));
+        buf[bytesRead] = '\0';
+        if (bytesRead == -1) {
             cleanup_job_list(job_list);
             exit(1);
         }
-        if (n == 0) {
+        if (bytesRead == 0) {
             cleanup_job_list(job_list);
             exit(0);
         }
@@ -95,8 +95,8 @@ int main(void) {
                             "syntax error: too many output/input redirects\n") <
                         0) {
                         perror(
-                            "Error printing too many output/input redirects "
-                            "error");
+                                "Error printing too many output/input redirects "
+                                "error");
                         cleanup_job_list(job_list);
                         exit(1);
                     }
@@ -117,8 +117,8 @@ int main(void) {
                                 "syntax error: redirects with no command\n") <
                             0) {
                             perror(
-                                "Error printing redirects with no command "
-                                "error");
+                                    "Error printing redirects with no command "
+                                    "error");
                             cleanup_job_list(job_list);
                             exit(1);
                         }
@@ -142,8 +142,8 @@ int main(void) {
                         if (fprintf(stderr,
                                     "open: No such file or directory\n") < 0) {
                             perror(
-                                "Error printing no such file or directory "
-                                "error");
+                                    "Error printing no such file or directory "
+                                    "error");
                             cleanup_job_list(job_list);
                             exit(1);
                         }
@@ -186,8 +186,8 @@ int main(void) {
                         if (fprintf(stderr,
                                     "open: No such file or directory\n") < 0) {
                             perror(
-                                "Error printing no such file or directory "
-                                "error");
+                                    "Error printing no such file or directory "
+                                    "error");
                             cleanup_job_list(job_list);
                             exit(1);
                         }
@@ -311,6 +311,102 @@ int main(void) {
                 continue;
             }
             jobs(job_list);
+        } else if (strcmp(tokens[0], "bg") == 0) {
+            int cur_pid;
+            if (argc != 2) {
+                if (fprintf(stderr, "%s: syntax error\n", tokens[0]) < 0) {
+                    perror("Error printing bg syntax error");
+                    cleanup_job_list(job_list);
+                    exit(1);
+                }
+                continue;
+            }
+            if (argv[1][0] != '%') {
+                if (fprintf(stderr, "%s: syntax error; need %%\n", tokens[0]) < 0) {
+                    perror("Error printing bg syntax error");
+                    cleanup_job_list(job_list);
+                    exit(1);
+                }
+                continue;
+            }
+            if ((cur_pid = get_job_pid(job_list, atoi(argv[1] + 1))) == -1) {
+                if (fprintf(stderr, "%s: invalid job id\n", tokens[0]) < 0) {
+                    perror("Error printing invalid job id error");
+                    cleanup_job_list(job_list);
+                    exit(1);
+                }
+                continue;
+            } else {
+                if (kill(-1 * cur_pid, SIGCONT) == 0) {
+                    update_job_pid(job_list, cur_pid, RUNNING);
+                } else {
+                    if (fprintf(stderr, "%s: kill error\n", tokens[0]) < 0) {
+                        perror("Error printing kill error");
+                        cleanup_job_list(job_list);
+                        exit(1);
+                    }
+                }
+            }
+        } else if (strcmp(tokens[0], "fg") == 0) {
+            int cur_pid;
+            if (argc != 2) {
+                if (fprintf(stderr, "%s: syntax error\n", tokens[0]) < 0) {
+                    perror("Error printing fg syntax error");
+                    cleanup_job_list(job_list);
+                    exit(1);
+                }
+                continue;
+            }
+            if (argv[1][0] != '%') {
+                if (fprintf(stderr, "%s: syntax error; need %%\n", tokens[0]) < 0) {
+                    perror("Error printing fg syntax error");
+                    cleanup_job_list(job_list);
+                    exit(1);
+                }
+                continue;
+            }
+            if ((cur_pid = get_job_pid(job_list, atoi(argv[1] + 1))) == -1) {
+                if (fprintf(stderr, "%s: invalid job id\n", tokens[0]) < 0) {
+                    perror("Error printing invalid job id error");
+                    cleanup_job_list(job_list);
+                    exit(1);
+                }
+                continue;
+            } else {
+                if (kill(-1 * cur_pid, SIGCONT) == 0) {
+                    remove_job_pid(job_list, cur_pid);
+                } else {
+                    if (fprintf(stderr, "%s: kill error\n", tokens[0]) < 0) {
+                        perror("Error printing kill error");
+                        cleanup_job_list(job_list);
+                        exit(1);
+                    }
+                }
+                int status;
+                waitpid(cur_pid, &status, WUNTRACED);
+                tcsetpgrp(STDIN_FILENO, cur_pid);
+                if (status == -1) {
+                    perror("Error waitpid");
+                } else if (WIFSIGNALED(status)) {
+                    if (printf("(%d) terminated by signal %d\n", cur_pid,
+                               WTERMSIG(status)) < 0) {
+                        perror("Error printing signal termination.");
+                        cleanup_job_list(job_list);
+                        exit(1);
+                    }
+                } else if (WIFSTOPPED(status)) {
+                    add_job(job_list, jid, cur_pid, STOPPED, command[0]);
+                    jid++;
+                    if (printf("[%d] (%d) suspended by signal %d\n",
+                               get_job_jid(job_list, cur_pid), cur_pid,
+                               WSTOPSIG(status)) < 0) {
+                        perror("Error printing signal suspension.");
+                        cleanup_job_list(job_list);
+                        exit(1);
+                    }
+                }
+                tcsetpgrp(STDIN_FILENO, getpgrp());
+            }
         } else {
             int filepath = 0;  // filepath index accounting for redirects
             for (int i = 0; redirects[i] != -1; i++)
@@ -371,7 +467,7 @@ int main(void) {
                         exit(1);
                     }
                 } else if (WIFSTOPPED(status)) {
-                    add_job(job_list, jid, pid, STOPPED, tokens[filepath]);
+                    add_job(job_list, jid, pid, STOPPED, command[0]);
                     jid++;
                     if (printf("[%d] (%d) suspended by signal %d\n",
                                get_job_jid(job_list, pid), pid,
