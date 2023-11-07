@@ -401,7 +401,6 @@ int main(void) {
                     }
                 } else if (WIFSTOPPED(status)) {
                     add_job(job_list, cur_jid, cur_pid, STOPPED, command[0]);
-                    //                    jid++;
                     if (printf("[%d] (%d) suspended by signal %d\n", cur_jid,
                                cur_pid, WSTOPSIG(status)) < 0) {
                         perror("Error printing signal suspension.");
@@ -454,12 +453,7 @@ int main(void) {
                     cleanup_job_list(job_list);
                     exit(1);
                 }
-                if (add_job(job_list, jid, pid, RUNNING, tokens[filepath]) <
-                    0) {
-                    perror("Error add job");
-                    cleanup_job_list(job_list);
-                    exit(1);
-                }
+                add_job(job_list, jid, pid, RUNNING, tokens[filepath]);
                 jid++;
             } else if (!background) {
                 int status;
