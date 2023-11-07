@@ -312,7 +312,7 @@ int main(void) {
                 continue;
             }
             jobs(job_list);
-        } else if (strcmp(tokens[0], "bg") == 0) {
+        } else if (strcmp(tokens[0], "bg") == 0) {  // builtin functions: bg
             int cur_pid;
             if (argc != 2) {
                 if (fprintf(stderr, "%s: syntax error\n", tokens[0]) < 0) {
@@ -349,7 +349,7 @@ int main(void) {
                     }
                 }
             }
-        } else if (strcmp(tokens[0], "fg") == 0) {
+        } else if (strcmp(tokens[0], "fg") == 0) {  // builtin functions: fg
             int cur_pid;
             if (argc != 2) {
                 if (fprintf(stderr, "%s: syntax error\n", tokens[0]) < 0) {
@@ -389,7 +389,6 @@ int main(void) {
                 int status;
                 tcsetpgrp(STDIN_FILENO, cur_pid);
                 waitpid(cur_pid, &status, WUNTRACED);
-                //                printf("command fg: %s\n", command[0]);
                 if (status == -1) {
                     perror("Error waitpid");
                 } else if (WIFSIGNALED(status)) {
