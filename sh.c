@@ -10,6 +10,8 @@
 #include "./jobs.h"
 #include "childReaper.c"
 #include "parsing.c"
+#include "redirectsErrorChecker.c"
+#include "syntaxErrorChecker.c"
 
 int main(void) {
     /* TODO: everything! */
@@ -20,16 +22,17 @@ int main(void) {
     // destinations
     char *command[1] = {""};  // command string
     int argc;
-    int bytesRead = 1;
+    ssize_t bytesRead = 1;
     int fileIn;        // new input file
     int fileOut;       // new output file
     int filepath = 0;  // filepath index accounting for redirects
     int background;    // background flag
-    int jid = 1;
+    int jid = 1;       // job id
     int stdin_copy = dup(STDIN_FILENO);
     int stdout_copy = dup(STDOUT_FILENO);
     job_list_t *job_list = init_job_list();
-    if (signal(SIGINT, SIG_IGN) == SIG_ERR) {
+    if (signal(SIGINT, SIG_IGN) ==
+        SIG_ERR) {  // Ignore following signals when no foreground process
         perror("SIGINT ignore error.");
         cleanup_job_list(job_list);
         exit(1);
@@ -44,8 +47,8 @@ int main(void) {
         cleanup_job_list(job_list);
         exit(1);
     }
-    while (1) {
-        childReaper(job_list);
+    while (bytesRead > 0) {
+        childReaper(job_list);  // reap zombie processes
 #ifdef PROMPT
         if (printf("33sh> ") < 0) {
             cleanup_job_list(job_list);
@@ -56,7 +59,7 @@ int main(void) {
             exit(1);
         }
 #endif
-        bytesRead = (int)read(STDIN_FILENO, buf, sizeof(buf));
+        bytesRead = read(STDIN_FILENO, buf, sizeof(buf));
         buf[bytesRead] = '\0';
         if (bytesRead == -1) {
             cleanup_job_list(job_list);
@@ -72,61 +75,13 @@ int main(void) {
         memset(redirects, -1,
                512 * 4);  // redirects must be set to -1 due to overlap with
         // possible redirect index values (e.g. 0)
-        argc = 0;
-        background = 0;
+        argc = 0;        // reset argc
+        background = 0;  // reset background flag
         parse(buf, tokens, argv, redirects);
-        while (argv[argc] != NULL) argc++;
-        if (redirects[0] != -1) {  // checking for redirects
-            int i = 0;
-            int oc = 0;   // output redirect counter
-            int ic = 0;   // input redirect counter
-            int err = 0;  // redirect error flag
-            for (; redirects[i] != -1 && err == 0; i++) {
-                if (strcmp(tokens[redirects[i]], ">") == 0 ||
-                    strcmp(tokens[redirects[i]], ">>") == 0) {
-                    oc++;
-                }
-                if (strcmp(tokens[redirects[i]], "<") == 0) {
-                    ic++;
-                }
-                if (oc > 1 || ic > 1) {
-                    err = 1;
-                    if (fprintf(
-                            stderr,
-                            "syntax error: too many output/input redirects\n") <
-                        0) {
-                        perror(
-                            "Error printing too many output/input redirects "
-                            "error");
-                        cleanup_job_list(job_list);
-                        exit(1);
-                    }
-                }
-                if (tokens[redirects[i] + 1] == NULL) {
-                    err = 1;
-                    if (fprintf(stderr,
-                                "syntax error: no input/output file\n") < 0) {
-                        perror("Error printing no input/output file error");
-                        cleanup_job_list(job_list);
-                        exit(1);
-                    }
-                } else {
-                    if (argv[0] == NULL) {
-                        err = 1;
-                        if (fprintf(
-                                stderr,
-                                "syntax error: redirects with no command\n") <
-                            0) {
-                            perror(
-                                "Error printing redirects with no command "
-                                "error");
-                            cleanup_job_list(job_list);
-                            exit(1);
-                        }
-                    }
-                }
-            }
-            if (err) continue;
+        while (argv[argc] != NULL) argc++;  // argv count set to argc
+        if (redirects[0] != -1) {           // checking for redirects
+            if (redirectsErrorChecker(tokens, redirects, argv, job_list) == -1)
+                continue;
             for (int j = 0; redirects[j] != -1; j++) {
                 if (strcmp(tokens[redirects[j]], "<") == 0) {
                     if (close(STDIN_FILENO) < 0) {
@@ -198,31 +153,21 @@ int main(void) {
             }
         }
         if (argc > 0 && strcmp(argv[argc - 1], "&") == 0) {  // checking for &
-            background = 1;
-            argv[argc - 1] = NULL;
+            background = 1;         // set background process flag
+            argv[argc - 1] = NULL;  // remove & from command line
         }
         if (!tokens[0])
             continue;
-        else if (strcmp(tokens[0], "exit") == 0) {  // builtin functions: exit
-            if (tokens[1] != NULL) {
-                if (fprintf(stderr, "%s: syntax error\n", tokens[0]) < 0) {
-                    perror("Error printing exit syntax error");
-                    cleanup_job_list(job_list);
-                    exit(1);
-                }
-            } else {
+        else if (strcmp(tokens[0], "exit") == 0) {  // builtin command: exit
+            if (syntaxErrorChecker(tokens[0], argv, argc, job_list) == -1)
+                continue;
+            else {
                 cleanup_job_list(job_list);
                 exit(0);
             }
-        } else if (strcmp(tokens[0], "cd") == 0) {  // builtin functions: cd
-            if (argc != 2) {
-                if (fprintf(stderr, "%s: syntax error\n", tokens[0]) < 0) {
-                    perror("Error printing cd syntax error");
-                    cleanup_job_list(job_list);
-                    exit(1);
-                }
+        } else if (strcmp(tokens[0], "cd") == 0) {  // builtin command: cd
+            if (syntaxErrorChecker(tokens[0], argv, argc, job_list) == -1)
                 continue;
-            }
             size_t l = strlen(argv[1]);
             if (l > 0 && argv[1][l - 1] == '/') argv[1][l - 1] = '\0';
             DIR *d = opendir(".");
@@ -255,24 +200,9 @@ int main(void) {
                 }
                 continue;
             }
-        } else if (strcmp(tokens[0], "ln") == 0) {  // builtin functions: ln
-            if (argc != 3) {
-                if (fprintf(stderr, "%s: syntax error\n", tokens[0]) < 0) {
-                    perror("Error printing ln syntax error");
-                    cleanup_job_list(job_list);
-                    exit(1);
-                }
+        } else if (strcmp(tokens[0], "ln") == 0) {  // builtin command: ln
+            if (syntaxErrorChecker(tokens[0], argv, argc, job_list) == -1)
                 continue;
-            }
-            size_t l1 = strlen(argv[1]);
-            if (l1 > 0 && argv[1][l1 - 1] == '/') {
-                if (fprintf(stderr, "%s: Not a directory\n", tokens[0]) < 0) {
-                    perror("Error printing not a directory error");
-                    cleanup_job_list(job_list);
-                    exit(1);
-                }
-                continue;
-            }
             size_t l2 = strlen(argv[2]);
             if (l2 > 0 && argv[2][l2 - 1] == '/') argv[1][l2 - 1] = '\0';
             if (link(argv[1], argv[2]) < 0) {
@@ -284,15 +214,9 @@ int main(void) {
                 }
                 continue;
             }
-        } else if (strcmp(tokens[0], "rm") == 0) {  // builtin functions: rm
-            if (argc != 2) {
-                if (fprintf(stderr, "%s: syntax error\n", tokens[0]) < 0) {
-                    perror("Error printing rm syntax error");
-                    cleanup_job_list(job_list);
-                    exit(1);
-                }
+        } else if (strcmp(tokens[0], "rm") == 0) {  // builtin command: rm
+            if (syntaxErrorChecker(tokens[0], argv, argc, job_list) == -1)
                 continue;
-            }
             if (unlink(argv[1]) < 0) {
                 if (fprintf(stderr, "%s: No such file or directory.\n",
                             tokens[0]) < 0) {
@@ -302,43 +226,18 @@ int main(void) {
                 }
                 continue;
             }
-        } else if (strcmp(tokens[0], "jobs") == 0) {  // builtin functions: job
-            if (argc != 1) {
-                if (fprintf(stderr, "%s: syntax error\n", tokens[0]) < 0) {
-                    perror("Error printing jobs syntax error");
-                    cleanup_job_list(job_list);
-                    exit(1);
-                }
+        } else if (strcmp(tokens[0], "jobs") == 0) {  // builtin command: job
+            if (syntaxErrorChecker(tokens[0], argv, argc, job_list) == -1)
                 continue;
-            }
             jobs(job_list);
-        } else if (strcmp(tokens[0], "bg") == 0) {  // builtin functions: bg
+        } else if (strcmp(tokens[0], "bg") == 0) {  // builtin command: bg
             int cur_pid;
-            if (argc != 2) {
-                if (fprintf(stderr, "%s: syntax error\n", tokens[0]) < 0) {
-                    perror("Error printing bg syntax error");
-                    cleanup_job_list(job_list);
-                    exit(1);
-                }
+            int cur_jid;
+            if (syntaxErrorChecker(tokens[0], argv, argc, job_list) == -1)
                 continue;
-            }
-            if (argv[1][0] != '%') {
-                if (fprintf(stderr, "%s: syntax error; need %%\n", tokens[0]) <
-                    0) {
-                    perror("Error printing bg syntax error");
-                    cleanup_job_list(job_list);
-                    exit(1);
-                }
-                continue;
-            }
-            if ((cur_pid = get_job_pid(job_list, atoi(argv[1] + 1))) == -1) {
-                if (fprintf(stderr, "%s: invalid job id\n", tokens[0]) < 0) {
-                    perror("Error printing invalid job id error");
-                    cleanup_job_list(job_list);
-                    exit(1);
-                }
-                continue;
-            } else {
+            else {
+                cur_jid = atoi(argv[1] + 1);
+                cur_pid = get_job_pid(job_list, cur_jid);
                 if (kill(-1 * cur_pid, SIGCONT) == 0) {
                     update_job_pid(job_list, cur_pid, RUNNING);
                 } else {
@@ -349,35 +248,16 @@ int main(void) {
                     }
                 }
             }
-        } else if (strcmp(tokens[0], "fg") == 0) {  // builtin functions: fg
+        } else if (strcmp(tokens[0], "fg") == 0) {  // builtin command: fg
             int cur_pid;
-            if (argc != 2) {
-                if (fprintf(stderr, "%s: syntax error\n", tokens[0]) < 0) {
-                    perror("Error printing fg syntax error");
-                    cleanup_job_list(job_list);
-                    exit(1);
-                }
+            int cur_jid;
+            if (syntaxErrorChecker(tokens[0], argv, argc, job_list) == -1)
                 continue;
-            }
-            if (argv[1][0] != '%') {
-                if (fprintf(stderr, "%s: syntax error; need %%\n", tokens[0]) <
-                    0) {
-                    perror("Error printing fg syntax error");
-                    cleanup_job_list(job_list);
-                    exit(1);
-                }
-                continue;
-            }
-            if ((cur_pid = get_job_pid(job_list, atoi(argv[1] + 1))) == -1) {
-                if (fprintf(stderr, "%s: invalid job id\n", tokens[0]) < 0) {
-                    perror("Error printing invalid job id error");
-                    cleanup_job_list(job_list);
-                    exit(1);
-                }
-                continue;
-            } else {
+            else {
+                cur_jid = atoi(argv[1] + 1);
+                cur_pid = get_job_pid(job_list, cur_jid);
                 if (kill(-1 * cur_pid, SIGCONT) == 0) {
-                    remove_job_jid(job_list, atoi(argv[1] + 1));
+                    remove_job_jid(job_list, cur_jid);
                 } else {
                     if (fprintf(stderr, "%s: kill error\n", tokens[0]) < 0) {
                         perror("Error printing kill error");
@@ -385,7 +265,6 @@ int main(void) {
                         exit(1);
                     }
                 }
-                int cur_jid = atoi(argv[1] + 1);
                 int status;
                 tcsetpgrp(STDIN_FILENO, cur_pid);
                 waitpid(cur_pid, &status, WUNTRACED);
@@ -412,7 +291,7 @@ int main(void) {
         } else {
             for (int i = 0; redirects[i] != -1;
                  i++)  // getting command index while accounting for redirect
-                       // chars
+                // chars
                 if (redirects[i] == 0) filepath += 2;
             if (strcmp(tokens[filepath], "fg") != 0)  // non-fg command setting
                 command[0] = tokens[filepath];

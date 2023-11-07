@@ -20,4 +20,6 @@ and implement the desired behavior. After we leave our fork, we check if the bac
 process is running in the desired place, foreground or background. If it's a background process then we'll add it to our
 job_list, and if it's a foreground process then we will wait for it to finish, and implement the desired behavior
 if a signal changes the state of our process. Throughout our program, we call cleanup_job_list() whenever we exit and
-error check any system calls that can possibly throw errors. The program can be compiled by calling ./33sh.
+error check any system calls that can possibly throw errors. The program can be compiled by calling ./33sh. We also
+have two error checking functions, one for builtin commands and one for redirects, both defined in their own
+eponymously named files.
