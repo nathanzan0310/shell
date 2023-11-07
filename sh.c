@@ -8,8 +8,8 @@
 #include <sys/wait.h>
 #include <unistd.h>
 #include "./jobs.h"
-#include "parsing.c"
 #include "childReaper.c"
+#include "parsing.c"
 
 int main(void) {
     /* TODO: everything! */
@@ -17,12 +17,12 @@ int main(void) {
     char *tokens[512];
     char *argv[512];
     int redirects[512];  // int array of redirect char indexes, excluding file
-// destinations
+                         // destinations
     char *command[1] = {""};  // command string
     int argc;
     int n = 1;
-    int fileIn;   // new input file
-    int fileOut;  // new output file
+    int fileIn;      // new input file
+    int fileOut;     // new output file
     int background;  // background flag
     int jid = 1;
     int stdin_copy = dup(STDIN_FILENO);
@@ -55,7 +55,7 @@ int main(void) {
             exit(1);
         }
 #endif
-        n = (int) read(STDIN_FILENO, buf, sizeof(buf));
+        n = (int)read(STDIN_FILENO, buf, sizeof(buf));
         buf[n] = '\0';
         if (n == -1) {
             cleanup_job_list(job_list);
@@ -90,16 +90,21 @@ int main(void) {
                 }
                 if (oc > 1 || ic > 1) {
                     err = 1;
-                    if(fprintf(stderr,
-                            "syntax error: too many output/input redirects\n") < 0) {
-                        perror("Error printing too many output/input redirects error");
+                    if (fprintf(
+                            stderr,
+                            "syntax error: too many output/input redirects\n") <
+                        0) {
+                        perror(
+                            "Error printing too many output/input redirects "
+                            "error");
                         cleanup_job_list(job_list);
                         exit(1);
                     }
                 }
                 if (tokens[redirects[i] + 1] == NULL) {
                     err = 1;
-                    if(fprintf(stderr, "syntax error: no input/output file\n") < 0) {
+                    if (fprintf(stderr,
+                                "syntax error: no input/output file\n") < 0) {
                         perror("Error printing no input/output file error");
                         cleanup_job_list(job_list);
                         exit(1);
@@ -107,9 +112,13 @@ int main(void) {
                 } else {
                     if (argv[0] == NULL) {
                         err = 1;
-                        if(fprintf(stderr,
-                                "syntax error: redirects with no command\n") < 0) {
-                            perror("Error printing redirects with no command error");
+                        if (fprintf(
+                                stderr,
+                                "syntax error: redirects with no command\n") <
+                            0) {
+                            perror(
+                                "Error printing redirects with no command "
+                                "error");
                             cleanup_job_list(job_list);
                             exit(1);
                         }
@@ -120,7 +129,7 @@ int main(void) {
             for (int j = 0; redirects[j] != -1; j++) {
                 if (strcmp(tokens[redirects[j]], "<") == 0) {
                     if (close(STDIN_FILENO) < 0) {
-                        if(fprintf(stderr, "Error closing stdin\n") < 0) {
+                        if (fprintf(stderr, "Error closing stdin\n") < 0) {
                             perror("Error printing closing stdin error");
                             cleanup_job_list(job_list);
                             exit(1);
@@ -130,8 +139,11 @@ int main(void) {
                     if ((fileIn = open(tokens[redirects[j] + 1], O_RDONLY)) <
                         0) {
                         dup2(stdin_copy, 0);
-                        if(fprintf(stderr, "open: No such file or directory\n") < 0) {
-                            perror("Error printing no such file or directory error");
+                        if (fprintf(stderr,
+                                    "open: No such file or directory\n") < 0) {
+                            perror(
+                                "Error printing no such file or directory "
+                                "error");
                             cleanup_job_list(job_list);
                             exit(1);
                         }
@@ -139,7 +151,7 @@ int main(void) {
                     }
                 } else if (strcmp(tokens[redirects[j]], ">") == 0) {
                     if (close(STDOUT_FILENO) < 0) {
-                        if(fprintf(stderr, "Error closing stdout\n") < 0) {
+                        if (fprintf(stderr, "Error closing stdout\n") < 0) {
                             perror("Error printing closing stdout error");
                             cleanup_job_list(job_list);
                             exit(1);
@@ -150,7 +162,8 @@ int main(void) {
                                         O_RDWR | O_CREAT | O_TRUNC, 0777)) <
                         0) {
                         dup2(stdout_copy, 1);
-                        if(fprintf(stderr, "open: No such file or directory\n") < 0) {
+                        if (fprintf(stderr,
+                                    "open: No such file or directory\n") < 0) {
                             perror("Error printing no such file or directory");
                             cleanup_job_list(job_list);
                             exit(1);
@@ -159,7 +172,7 @@ int main(void) {
                     }
                 } else if (strcmp(tokens[redirects[j]], ">>") == 0) {
                     if (close(STDOUT_FILENO) < 0) {
-                        if(fprintf(stderr, "Error closing stdout\n") < 0) {
+                        if (fprintf(stderr, "Error closing stdout\n") < 0) {
                             perror("Error printing closing stdout error");
                             cleanup_job_list(job_list);
                             exit(1);
@@ -170,8 +183,11 @@ int main(void) {
                                         O_RDWR | O_CREAT | O_APPEND, 0777)) <
                         0) {
                         dup2(stdout_copy, 1);
-                        if(fprintf(stderr, "open: No such file or directory\n") < 0) {
-                            perror("Error printing no such file or directory error");
+                        if (fprintf(stderr,
+                                    "open: No such file or directory\n") < 0) {
+                            perror(
+                                "Error printing no such file or directory "
+                                "error");
                             cleanup_job_list(job_list);
                             exit(1);
                         }
@@ -188,7 +204,7 @@ int main(void) {
             continue;
         else if (strcmp(tokens[0], "exit") == 0) {  // builtin functions: exit
             if (tokens[1] != NULL) {
-                if(fprintf(stderr, "%s: syntax error\n", tokens[0]) < 0) {
+                if (fprintf(stderr, "%s: syntax error\n", tokens[0]) < 0) {
                     perror("Error printing exit syntax error");
                     cleanup_job_list(job_list);
                     exit(1);
@@ -199,7 +215,7 @@ int main(void) {
             }
         } else if (strcmp(tokens[0], "cd") == 0) {  // builtin functions: cd
             if (argc != 2) {
-                if(fprintf(stderr, "%s: syntax error\n", tokens[0]) < 0) {
+                if (fprintf(stderr, "%s: syntax error\n", tokens[0]) < 0) {
                     perror("Error printing cd syntax error");
                     cleanup_job_list(job_list);
                     exit(1);
@@ -230,7 +246,8 @@ int main(void) {
                     exit(1);
                 }
             } else {
-                if(fprintf(stderr, "%s: No such file or directory.\n", tokens[0]) < 0) {
+                if (fprintf(stderr, "%s: No such file or directory.\n",
+                            tokens[0]) < 0) {
                     perror("Error printing no such file or directory error");
                     cleanup_job_list(job_list);
                     exit(1);
@@ -239,7 +256,7 @@ int main(void) {
             }
         } else if (strcmp(tokens[0], "ln") == 0) {  // builtin functions: ln
             if (argc != 3) {
-                if(fprintf(stderr, "%s: syntax error\n", tokens[0]) < 0) {
+                if (fprintf(stderr, "%s: syntax error\n", tokens[0]) < 0) {
                     perror("Error printing ln syntax error");
                     cleanup_job_list(job_list);
                     exit(1);
@@ -248,7 +265,7 @@ int main(void) {
             }
             size_t l1 = strlen(argv[1]);
             if (l1 > 0 && argv[1][l1 - 1] == '/') {
-                if(fprintf(stderr, "%s: Not a directory\n", tokens[0]) < 0) {
+                if (fprintf(stderr, "%s: Not a directory\n", tokens[0]) < 0) {
                     perror("Error printing not a directory error");
                     cleanup_job_list(job_list);
                     exit(1);
@@ -258,7 +275,8 @@ int main(void) {
             size_t l2 = strlen(argv[2]);
             if (l2 > 0 && argv[2][l2 - 1] == '/') argv[1][l2 - 1] = '\0';
             if (link(argv[1], argv[2]) < 0) {
-                if(fprintf(stderr, "%s: No such file or directory.\n", tokens[0]) < 0) {
+                if (fprintf(stderr, "%s: No such file or directory.\n",
+                            tokens[0]) < 0) {
                     perror("Error printing no such file or directory error");
                     cleanup_job_list(job_list);
                     exit(1);
@@ -267,7 +285,7 @@ int main(void) {
             }
         } else if (strcmp(tokens[0], "rm") == 0) {  // builtin functions: rm
             if (argc != 2) {
-                if(fprintf(stderr, "%s: syntax error\n", tokens[0]) < 0) {
+                if (fprintf(stderr, "%s: syntax error\n", tokens[0]) < 0) {
                     perror("Error printing rm syntax error");
                     cleanup_job_list(job_list);
                     exit(1);
@@ -275,7 +293,8 @@ int main(void) {
                 continue;
             }
             if (unlink(argv[1]) < 0) {
-                if(fprintf(stderr, "%s: No such file or directory.\n", tokens[0]) < 0) {
+                if (fprintf(stderr, "%s: No such file or directory.\n",
+                            tokens[0]) < 0) {
                     perror("Error printing no such file or directory error");
                     cleanup_job_list(job_list);
                     exit(1);
@@ -284,7 +303,7 @@ int main(void) {
             }
         } else if (strcmp(tokens[0], "jobs") == 0) {  // builtin functions: job
             if (argc != 1) {
-                if(fprintf(stderr, "%s: syntax error\n", tokens[0]) < 0) {
+                if (fprintf(stderr, "%s: syntax error\n", tokens[0]) < 0) {
                     perror("Error printing jobs syntax error");
                     cleanup_job_list(job_list);
                     exit(1);
@@ -338,14 +357,15 @@ int main(void) {
                     cleanup_job_list(job_list);
                     exit(1);
                 }
-                    jid++;
+                jid++;
             } else if (!background) {
                 int status;
                 waitpid(pid, &status, WUNTRACED);
-                if(status == -1){
+                if (status == -1) {
                     perror("Error waitpid");
                 } else if (WIFSIGNALED(status)) {
-                    if (printf("(%d) terminated by signal %d\n", pid, WTERMSIG(status)) < 0) {
+                    if (printf("(%d) terminated by signal %d\n", pid,
+                               WTERMSIG(status)) < 0) {
                         perror("Error printing signal termination.");
                         cleanup_job_list(job_list);
                         exit(1);
@@ -354,7 +374,8 @@ int main(void) {
                     add_job(job_list, jid, pid, STOPPED, tokens[filepath]);
                     jid++;
                     if (printf("[%d] (%d) suspended by signal %d\n",
-                               get_job_jid(job_list, pid), pid, WSTOPSIG(status)) < 0) {
+                               get_job_jid(job_list, pid), pid,
+                               WSTOPSIG(status)) < 0) {
                         perror("Error printing signal suspension.");
                         cleanup_job_list(job_list);
                         exit(1);
