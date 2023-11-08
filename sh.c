@@ -20,7 +20,6 @@ int main(void) {
     char *argv[512];
     int redirects[512];  // int array of redirect char indexes, excluding file
     // destinations
-    char *command[1] = {""};  // command string
     int argc;
     ssize_t bytesRead = 1;
     int fileIn;        // new input file
@@ -256,9 +255,7 @@ int main(void) {
             else {
                 cur_jid = (int)strtol(argv[1] + 1, NULL, 10);
                 cur_pid = get_job_pid(job_list, cur_jid);
-                if (kill(-1 * cur_pid, SIGCONT) == 0) {
-                    remove_job_jid(job_list, cur_jid);
-                } else {
+                if (kill(-1 * cur_pid, SIGCONT) == -1) {
                     if (fprintf(stderr, "%s: kill error\n", tokens[0]) < 0) {
                         perror("Error printing kill error");
                         cleanup_job_list(job_list);
@@ -272,6 +269,8 @@ int main(void) {
                     perror("Error waitpid");
                     cleanup_job_list(job_list);
                     exit(0);
+                } else if (WIFEXITED(status)) {
+                    remove_job_pid(job_list, cur_pid);
                 } else if (WIFSIGNALED(status)) {
                     if (printf("(%d) terminated by signal %d\n", cur_pid,
                                WTERMSIG(status)) < 0) {
@@ -279,14 +278,15 @@ int main(void) {
                         cleanup_job_list(job_list);
                         exit(0);
                     }
+                    remove_job_pid(job_list, cur_pid);
                 } else if (WIFSTOPPED(status)) {
-                    add_job(job_list, cur_jid, cur_pid, STOPPED, command[0]);
                     if (printf("[%d] (%d) suspended by signal %d\n", cur_jid,
                                cur_pid, WSTOPSIG(status)) < 0) {
                         perror("Error printing signal suspension.");
                         cleanup_job_list(job_list);
                         exit(0);
                     }
+                    update_job_pid(job_list, cur_pid, STOPPED);
                 }
                 tcsetpgrp(STDIN_FILENO, getpgrp());
             }
@@ -295,8 +295,6 @@ int main(void) {
                  i++)  // getting command index while accounting for redirect
                 // chars
                 if (redirects[i] == 0) filepath += 2;
-            if (strcmp(tokens[filepath], "fg") != 0)  // non-fg command setting
-                command[0] = tokens[filepath];
             pid_t pid = fork();
             if (!pid) {
                 setpgid(pid, getpid());

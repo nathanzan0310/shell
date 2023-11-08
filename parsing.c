@@ -47,14 +47,14 @@ void parse(char buffer[1024], char *tokens[512], char *argv[512],
     int j = 0;   // argv array index
     int k = 0;   // redirect array index
     int r = -2;  // redirection char index set to -2 to avoid false positives as
-                 // we check if i-1=r, where i starts at 0
+    // we check if i-1=r, where i starts at 0
     for (i = 0; (token = strtok(str, " \t\n")) != NULL; i++) {
         tokens[i] = token;
         str = NULL;
         if (strcmp(tokens[i], ">") != 0 && strcmp(tokens[i], ">>") != 0 &&
             strcmp(tokens[i], "<") != 0 && i - 1 != r) {
             argv[j] = tokens[i];  // ignore all redirect chars and their
-                                  // succeeding files when adding to argv
+            // succeeding files when adding to argv
             j++;
         } else if (strcmp(tokens[i], ">") == 0 ||
                    strcmp(tokens[i], ">>") == 0 ||
